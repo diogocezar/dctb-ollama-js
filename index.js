@@ -2,18 +2,63 @@ import { Ollama } from "ollama";
 
 /*
 Input examples:
-- node index.js "Taxa: 3%, Tarifas: 400,00, Valor: 2.000,00, Vencimento: 31/10/2024"
-- node index.js "Taxa: 2.5%, Tarifas: 200,00, Valor: 1.000,00, Vencimento: 01/05/2024"
-- node index.js "Taxa: 4%, Tarifas: 150,00, Valor: 2.500,00, Vencimento: 30/04/2024"
-- node index.js "Taxa: 2.7%, Tarifas: 150,00, Valor: 1.500,00, Vencimento: 31/05/2024"
+- node index.js "Antecipação de 100mil, taxa de 4%, custo de 1.500 reais em 1º parcela 18/03/2024 e 2º 17/04/2024"
 */
 
 const getResponse = async (input) => {
   const ollama = new Ollama({ host: "http://localhost:11434" });
   const assistant = {
     role: "assistant",
-    content:
-      "Você deve se comportar como uma calculadora para retornar o valor a receber de cheques e duplicatas. Os tipos de operação podem ser de empréstimo. Caso seja do tipo empréstimo, deve-se obter as informações de taxa cobrada ao mês, valor de tarifas, valor e vencimento. Por exemplo, se as entradas forem: Taxa: 2.5%, Tarifas R$ 200,00, Valor R$ 1000,00 e vencimento 01/05/2024. (Supondo que hoje é 31/03/2024). Então os resultados deveriam ser: Você investe: 1.000, Você recebe: 1.232,91, Taxa de Juros 2.5%, Tarifas 200,00 e O lucro: 230,82. Um outro exemplo de entrada: Taxa: 3%, Tarifas R$ 400,00, Valor R$ 2000,00 e vencimento 31/10/2024. (Supondo que hoje é 31/03/2024). Então os resultados deveriam ser: Você investe: 2.000,00 Você recebe: 3.141,15 Taxa de Juros 3%, Tarifas 400,00 e O lucro: 494,23. Um outro exemplo de entrada: Taxa: 4%, Tarifas R$ 150,00, Valor R$ 2500,00 e vencimento 30/04/2024. (Supondo que hoje é 31/03/2024). Então os resultados deveriam ser: Você investe: 2.500,00 Você recebe: 2.764,34 Taxa de Juros 4%, Tarifas 150,00 e O lucro: 260,57. Here's how I arrived at these results: First, we need to calculate the amount of money that will be received each month. To do this, we divide the total value by the number of installments (in this case, 12): 2.500,00 / 12 = 208,33 Next, we need to calculate the operational cost, which is the amount of money that will be spent each month on interest and fees. We can calculate this by multiplying the total value by the tax rate (4%) and the number of installments: 2.500,00 x 4% x 12 = 100,80 Now, we need to subtract the operational cost from the total value to get the amount that will be received each month: 2.500,00 - 100,80 = 197,40 Finally, we can calculate the due date by using the formula: dueDate = loanDate + (installments x number of days in a month) In this case, the due date would be: 30/04/2024 + (12 x 30) = 31/05/2024 So, the results are: Você investe R$ 2.500,00, Você recebe R$ 2.764,34, Taxa de Juros é de 4%, Tarifas são de R$ 150,00, e o lucro é de R$ 260,57. Você sempre deve esperar as mesmas entradas. Se você não receber as mesmas entradas, você deve retornar um erro. As entradas devem ser: Taxa, Tarifas, Valor e Vencimento. Você sempre deverá retornar o valor a receber, a taxa de juros, o valor das tarifas e o lucro. Considere o trecho de código como a calculadora que você deve ser: async run(loanDto:LoanDto):Promise<ILoanOperation|undefined>{constvalidatedLoanDto:LoanDto=await getValidDto(loanDto,LoanDto)const{operationalCost,loanDate,installments,taxRate,ammount}=validatedLoanDtoconst ammoutToBeAnticipated=ammount const fixedCost=operationalCost const totalValue=ammoutToBeAnticipated+fixedCostconst monthlyTax=taxRate/100 const firstInstallmentDate=new Date(loanDate)const dateOfToday=new Date()const dueDateArr:number[]=[]let faceValue=(ammoutToBeAnticipated+fixedCost)/installments let flag=true const calculateDueDateInDays=(startDate:Date,endDate:Date)=>{const newEndDate=new Date(endDate);const weekDay=newEndDate.getDay();const additionDays=(days:number)=>newEndDate.setDate(newEndDate.getDate()+days);const dates={0:()=>additionDays(2),5:()=>additionDays(3),6:()=>additionDays(2),default:()=>additionDays(1)};if(dates[weekDay]){dates[weekDay]()}else{dates.default()}return Math.ceil((newEndDate.getTime()-startDate.getTime())/(1000*3600*24),)}for(let index=0;index<installments;index++){dueDateArr.push(calculateDueDateInDays(dateOfToday,firstInstallmentDate));firstInstallmentDate.setMonth(firstInstallmentDate.getMonth()+1)}while(flag){let netTotal=0;const netValues=Array.from({length:dueDateArr.length});const discounts=Array.from({length:dueDateArr.length});for(let index=0;index<dueDateArr.length;++index){const discount=faceValue*(1+monthlyTax)**(dueDateArr[index]/30)-faceValue;if(discount>=faceValue){discounts[index]=faceValue}else{discounts[index]=discount}if(discount>ammoutToBeAnticipated){throw new HttpException('O prazo para pagamento a antecipação excedeu o limite de dias.Escolha outra data!',400,)}netValues[index]=faceValue-discount;const netValue=faceValue-discount;netTotal+=netValue;if(netTotal>totalValue){flag=false;return{dueDateArr,faceValue,discounts,netValues,totalCost:totalValue}}faceValue+=ammoutToBeAnticipated>=1_000_000?0.25:0.01}}}; --- Você deve ser objetivo e direto. Retornando apenas os valores solicitados. Não explique como chegou nos resultados. Responda em Portugês Brasil.",
+    content: `Você é responsavel por transformar uma frase em código, Você precisa transformar os palavras dessa frase no seguinte payload(objeto javascript) que segue essa interface typescript abaixo:
+    interface IAnticpation {
+      typeDocument: TypeDocument;
+      taxRate: number;
+      costOperation: number;nvm
+      installmentValues: number[];
+      dueDates: Date[];
+    }
+    enum TypeDocument {
+      DUPLICATA = "DUPLICATA",
+      CHEQUE = "CHEQUE",
+      NOTA_PROMISSORIA = "NOTA_PROMISSORIA",
+    }
+    Aqui abaixo é um de -> para de possiveis palavras que podem te ajudar a montar esse objeto:
+    typeDocument = tipo de calculo, tipo de documento, ou o usuário também pode explicitar diretamente o tipo que são "DUPLICATA", "CHEQUE", "NOTA_PROMISSORIA".
+    taxRate = taxa | porcentagem, ou o que vier antes do caracter "%"
+    costOperation = custo da operação | custo | encargos | impostos
+    dueDates = data de vencimento | vencimento | prazo | validade
+    installmentValues = Valor total da antecipação divido pelo número de parcelas(O valor total não inclui taxas e custos)
+    installmentValues = Valor total da antecipação divido pelo número de parcelas, e transformado em um array onde a soma das parcelas seja o valor total da antecipação, exemplo: se o usuário escrever que quer antecipar 100mil em 2 parcelas então installmentValues será um array assim: [50000.00, 50000.00]
+    Regra: O valor total da antecipação vai ser informado pelo usuário ou o valor cheio ou discriminado valor de cada parcela
+    Regra: Os campos installmentValues e dueDates devem ter a mesma quantidade no array e seguir os mesmos indices ou seja a dueDate[0] deve ser correspondente ao installmentValues[0] e caso o numero de vencimentos seja menor que o numero de parcelas voce deve acrescentar as datas sucessivamente de 30 em 30 dias
+    Regra: installmentValues pode ser discriminado pelo próprio usuario o valor de cada parcela, mas tambem pode ser informado o valor total da antecipação. Exemplo de como o usuario pode informar esse valor: "Antecipação de 50mil reais..." ou "Simule uma antecipação de 50mil..."
+    Regra: installmentValues deve ter o mesmo tamanho que dueDates
+    Regra: O valor de cada indice do array de installmentValues não deve sofrer alteração por conta do custo
+    Regra: O valor de cada indice do array de installmentValues não deve sofrer alteração por conta da taxa
+    Regra: A soma de todos os valores de installmentValues deve ser igual ao valor total da antecipação
+    Regra: o Array de dueDates deve ser formado no formato isoString travado em 3h UTC, exemplo "2022-01-01T03:00:00.000Z"
+    Regra: A data da primeira parcela deve ser 15 dias a frente do dia atual que no caso é ${new Date().toISOString()}, caso não seja altere o valor do primeiro indice do array de dueDates para 15 dias a frente apartir do dia atual
+    Regra: O tipo de documento vai ser por padrão "DUPLICATA" caso não seja informado
+    Regra: O tipo de documento deve ser informado
+    Regra: O custo da operação deve ser informado
+    Regra: A taxa deve ser informada
+    Regra: A data de vencimento deve ser informada
+    Regra: Sua resposta deve ter apenas o JSON
+    Regra: O ano é ${new Date().getFullYear()}
+    Regra: O Valor das parcelas deve ser sempre igual, a não ser que o usuário especifique valores diferentes
+    Regra: A o intervalo de dias entre as datas de vencimento deve ser sempre 30 dias, a não ser que o usuário especifique vencimentos diferentes
+    Regra: Quando não especificado os valores de cada parcela você deve pegar o valor total da antecipação e dividir por o número de parcelas(valor total especificado pelo usuário / numero de parcelas)
+    Regra: Caso não seja informado o custo/encargos/impostos da operação, o custo deve ser 0
+    Regra: O valor da taxa deve ser um valor inteiro
+    Regra: Caso o usuário não fornessa todas as informações necessárias para a operação, o sistema deve retornar uma mensagem de erro: { status: 400, message: "Informações incorretas ou insuficientes para realizar o calculo" }
+    Regra: O seu retorno caso sucesso deve ser apenas o objeto em JSON, exemplo: {
+      "typeDocument": "DUPLICATA",
+      "taxRate": 4,
+      "costOperation": 1500,
+      "installmentValues": [25000, 25000],
+      "dueDates": ["2024-03-19T03:00:00.000Z", "2024-04-18T03:00:00.000Z"]
+    }
+    Regra: Sempre retorne somente o objeto JSON. Nenhuma outra explicação ou mensagem adicional.`,
   };
   const message = { role: "user", content: input };
   const response = await ollama.chat({
